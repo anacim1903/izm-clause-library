@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IZM Clause Library</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <span class="logo">IZM</span>
+    <span class="title">Clause Library</span>
+  </header>
+
+  <div id="searchArea" style="display:none">
+    <input  id="searchInput" type="text"   placeholder="Search clauses…"  oninput="filterClauses()" />
+    <select id="typeFilter"                                                onchange="filterClauses()">
+      <option value="">All agreement types</option>
+    </select>
+    <div id="count" class="count"></div>
+  </div>
+
+  <p id="status">Initialising…</p>
+  <div id="clauseList"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
