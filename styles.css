@@ -1,0 +1,114 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  color: #222;
+  background: #fff;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  background: #1b2a4a;
+  color: #fff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+.logo {
+  font-weight: 700;
+  font-size: 12px;
+  background: #c8a951;
+  color: #1b2a4a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+.title {
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+#searchArea {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+#searchInput,
+#typeFilter {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+  background: #fafafa;
+  color: #222;
+}
+#searchInput:focus,
+#typeFilter:focus {
+  border-color: #1b2a4a;
+  background: #fff;
+}
+.count {
+  font-size: 11px;
+  color: #999;
+}
+
+#status {
+  padding: 16px 14px;
+  font-style: italic;
+}
+
+#clauseList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.clause-card {
+  padding: 11px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.clause-card:hover {
+  background: #f4f6fb;
+}
+.clause-card:active {
+  background: #e8ecf5;
+}
+
+.clause-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1b2a4a;
+  margin-bottom: 3px;
+}
+.clause-type {
+  font-size: 10px;
+  color: #c8a951;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+.clause-preview {
+  font-size: 11px;
+  color: #777;
+  line-height: 1.45;
+}
+
+.empty {
+  padding: 20px 14px;
+  color: #aaa;
+  text-align: center;
+  font-style: italic;
+}
