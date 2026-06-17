@@ -66,10 +66,14 @@ async function loadClauses() {
     const encoded = FILE_PATH.split('/').map(encodeURIComponent).join('/');
     const base    = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encoded}:`;
 
-    const wsRes = await fetch(`${base}/workbook/worksheets`, { headers });
-    if (!wsRes.ok) throw new Error(`Could not open workbook (HTTP ${wsRes.status})`);
-    const { value: sheets } = await wsRes.json();
-    if (!sheets || !sheets.length) throw new Error('No worksheets found in the Excel file.');
+     const wsRes = await fetch(
+      `${base}/workbook/worksheets`,
+      { headers }
+    );
+    if (!wsRes.ok) {
+      const errBody = await wsRes.json().catch(() => ({}));
+      throw new Error(`Could not open workbook (HTTP ${wsRes.status}): ${errBody?.error?.message || 'no detail'}`);
+    }
 
     const sheetName = sheets[0].name;
     const dataRes = await fetch(
