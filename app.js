@@ -1,12 +1,13 @@
 'use strict';
 
-const CLIENT_ID    = '44d73efb-0980-447f-8629-04c970ac0e74';
-const TENANT_ID    = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
-const SCOPES       = ['Files.ReadWrite', 'Sites.Read.All'];
+const CLIENT_ID = '44d73efb-0980-447f-8629-04c970ac0e74';
+const TENANT_ID = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
+const SCOPES    = ['Files.ReadWrite'];
 
-const SITE_URL     = 'https://graph.microsoft.com/v1.0/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:';
-const LIBRARY_NAME = 'Documentos Compartilhados';
-const FILE_PATH    = 'AI/260616 - IZM Clauses.xlsx';
+const FILE_URL  =
+  'https://graph.microsoft.com/v1.0' +
+  '/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:' +
+  '/drive/root:/AI/260616%20-%20IZM%20Clauses.xlsx:/content';
 
 let msalInstance;
 let allClauses = [];
@@ -55,26 +56,13 @@ async function loadClauses() {
     const token   = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
 
-    // Find the document library drive
-    const drivesRes = await fetch(`${SITE_URL}/drives`, { headers });
-    if (!drivesRes.ok) throw new Error(`Could not list drives (HTTP ${drivesRes.status})`);
-    const { value: drives } = await drivesRes.json();
-    const drive = drives.find(d => d.name === LIBRARY_NAME) || drives[0];
-    if (!drive) throw new Error('No document libraries found on this SharePoint site.');
-
-    // Download the Excel file directly
-    const encoded = FILE_PATH.split('/').map(encodeURIComponent).join('/');
-    const fileRes = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encoded}:/content`,
-      { headers }
-    );
+    const fileRes = await fetch(FILE_URL, { headers });
     if (!fileRes.ok) throw new Error(`Could not download file (HTTP ${fileRes.status})`);
 
-    // Parse with SheetJS
-    const buffer   = await fileRes.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
-    const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-    const values   = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const buffer = await fileRes.arrayBuffer();
+    const wb     = XLSX.read(buffer, { type: 'array' });
+    const sheet  = wb.Sheets[wb.SheetNames[0]];
+    const values = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     if (!values || values.length < 2) {
       showStatus('No clauses found. Add rows to the Excel file and reload.');
