@@ -1,13 +1,12 @@
 'use strict';
 
-const CLIENT_ID = '44d73efb-0980-447f-8629-04c970ac0e74';
-const TENANT_ID = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
-const SCOPES    = ['Files.ReadWrite'];
+const CLIENT_ID    = '44d73efb-0980-447f-8629-04c970ac0e74';
+const TENANT_ID    = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
+const SCOPES       = ['Files.Read', 'Sites.Read.All'];
 
-const FILE_URL  =
-  'https://graph.microsoft.com/v1.0' +
-  '/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:' +
-  '/drive/root:/AI/260616%20-%20IZM%20Clauses.xlsx:/content';
+const SITE_URL     = 'https://graph.microsoft.com/v1.0/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:';
+const LIBRARY_NAME = 'Documentos Compartilhados';
+const FILE_PATH    = 'AI/260616 - IZM Clauses.xlsx';
 
 let msalInstance;
 let allClauses = [];
@@ -56,4 +55,127 @@ async function loadClauses() {
     const token   = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
 
-    const fileRes = await fetch(FILE_URL,
+    // Find the document library by name
+    const drivesRes = await fetch(`${SITE_URL}/drives`, { headers });
+    if (!drivesRes.ok) throw new Error(`Could not list drives (HTTP ${drivesRes.status})`);
+    const { value: drives } = await drivesRes.json();
+    const drive = drives.find(d => d.name === LIBRARY_NAME) || drives[0];
+    if (!drive) throw new Error('No document libraries found on this SharePoint site.');
+
+    // Access the Excel workbook
+    const encoded = FILE_PATH.split('/').map(encodeURIComponent).join('/');
+    const base    = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encoded}:`;
+
+    const wsRes = await fetch(`${base}/workbook/worksheets`, { headers });
+    if (!wsRes.ok) throw new Error(`Could not open workbook (HTTP ${wsRes.status})`);
+    const { value: sheets } = await wsRes.json();
+    if (!sheets || !sheets.length) throw new Error('No worksheets found in the Excel file.');
+
+    const sheetName = sheets[0].name;
+    const dataRes = await fetch(
+      `${base}/workbook/worksheets('${encodeURIComponent(sheetName)}')/usedRange`,
+      { headers }
+    );
+    if (!dataRes.ok) throw new Error(`Could not read sheet data (HTTP ${dataRes.status}).`);
+    const { values } = await dataRes.json();
+
+    if (!values || values.length < 2) {
+      showStatus('No clauses found. Add rows to the Excel file and reload.');
+      return;
+    }
+
+    allClauses = values
+      .slice(1)
+      .filter(r => r[0])
+      .map(r => ({
+        title: String(r[0] ?? '').trim(),
+        type:  String(r[1] ?? '').trim(),
+        text:  String(r[2] ?? '').trim(),
+      }));
+
+    populateFilter();
+    renderClauses(allClauses);
+    document.getElementById('searchArea').style.display = 'flex';
+    document.getElementById('status').style.display     = 'none';
+
+  } catch (e) {
+    showError(e);
+  }
+}
+
+function populateFilter() {
+  const types  = [...new Set(allClauses.map(c => c.type).filter(Boolean))].sort();
+  const select = document.getElementById('typeFilter');
+  while (select.options.length > 1) select.remove(1);
+  types.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t;
+    o.textContent = t;
+    select.appendChild(o);
+  });
+}
+
+function filterClauses() {
+  const q    = document.getElementById('searchInput').value.toLowerCase();
+  const type = document.getElementById('typeFilter').value;
+  renderClauses(allClauses.filter(c => {
+    const matchQ = !q || c.title.toLowerCase().includes(q) || c.text.toLowerCase().includes(q);
+    const matchT = !type || c.type === type;
+    return matchQ && matchT;
+  }));
+}
+
+function renderClauses(clauses) {
+  const list  = document.getElementById('clauseList');
+  const count = document.getElementById('count');
+  count.textContent = `${clauses.length} clause${clauses.length !== 1 ? 's' : ''}`;
+  list.innerHTML = '';
+  if (!clauses.length) {
+    list.innerHTML = '<p class="empty">No clauses match your search.</p>';
+    return;
+  }
+  clauses.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'clause-card';
+    card.innerHTML = `
+      <div class="clause-title">${esc(c.title)}</div>
+      ${c.type ? `<div class="clause-type">${esc(c.type)}</div>` : ''}
+      <div class="clause-preview">${esc(c.text.slice(0, 140))}${c.text.length > 140 ? '…' : ''}</div>
+    `;
+    card.addEventListener('click', () => insertClause(c));
+    list.appendChild(card);
+  });
+}
+
+async function insertClause(c) {
+  try {
+    await Word.run(async ctx => {
+      ctx.document.getSelection().insertText(c.text, Word.InsertLocation.replace);
+      await ctx.sync();
+    });
+  } catch (e) {
+    alert('Could not insert clause:\n' + e.message);
+  }
+}
+
+function showStatus(msg) {
+  const s = document.getElementById('status');
+  s.textContent       = msg;
+  s.style.display     = 'block';
+  s.style.color       = '#666';
+  document.getElementById('searchArea').style.display = 'none';
+  document.getElementById('clauseList').innerHTML      = '';
+}
+
+function showError(err) {
+  const s = document.getElementById('status');
+  s.textContent   = '⚠ ' + (err?.message || String(err));
+  s.style.display = 'block';
+  s.style.color   = '#c0392b';
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
