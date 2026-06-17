@@ -1,15 +1,12 @@
 'use strict';
 
-// ── Configuration ─────────────────────────────────────────────────────────────
+const CLIENT_ID    = '44d73efb-0980-447f-8629-04c970ac0e74';
+const TENANT_ID    = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
+const SCOPES       = ['Files.Read', 'Sites.Read.All'];
 
-const CLIENT_ID = '44d73efb-0980-447f-8629-04c970ac0e74';
-const TENANT_ID = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
-const SCOPES    = ['Files.Read', 'Sites.Read.All'];
-
-const WORKBOOK_BASE =
-  'https://graph.microsoft.com/v1.0' +
-  '/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:' +
-  '/drive/root:/AI/260616%20-%20IZM%20Clauses.xlsx:';
+const SITE_URL     = 'https://graph.microsoft.com/v1.0/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:';
+const LIBRARY_NAME = 'Documentos Compartilhados';
+const FILE_PATH    = 'AI/260616 - IZM Clauses.xlsx';
 
 let msalInstance;
 let allClauses = [];
@@ -23,7 +20,6 @@ Office.onReady(() => {
     },
     cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
   });
-
   msalInstance.handleRedirectPromise().then(init).catch(showError);
 });
 
@@ -59,14 +55,25 @@ async function loadClauses() {
     const token   = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
 
-    const wsRes = await fetch(`${WORKBOOK_BASE}/workbook/worksheets`, { headers });
-    if (!wsRes.ok) throw new Error(`Could not open workbook (HTTP ${wsRes.status}). Check the file path and permissions.`);
+    // Find the document library by name
+    const drivesRes = await fetch(`${SITE_URL}/drives`, { headers });
+    if (!drivesRes.ok) throw new Error(`Could not list drives (HTTP ${drivesRes.status})`);
+    const { value: drives } = await drivesRes.json();
+    const drive = drives.find(d => d.name === LIBRARY_NAME) || drives[0];
+    if (!drive) throw new Error('No document libraries found on this SharePoint site.');
+
+    // Access the Excel workbook
+    const encoded = FILE_PATH.split('/').map(encodeURIComponent).join('/');
+    const base    = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encoded}:`;
+
+    const wsRes = await fetch(`${base}/workbook/worksheets`, { headers });
+    if (!wsRes.ok) throw new Error(`Could not open workbook (HTTP ${wsRes.status})`);
     const { value: sheets } = await wsRes.json();
     if (!sheets || !sheets.length) throw new Error('No worksheets found in the Excel file.');
-    const sheetName = sheets[0].name;
 
+    const sheetName = sheets[0].name;
     const dataRes = await fetch(
-      `${WORKBOOK_BASE}/workbook/worksheets('${encodeURIComponent(sheetName)}')/usedRange`,
+      `${base}/workbook/worksheets('${encodeURIComponent(sheetName)}')/usedRange`,
       { headers }
     );
     if (!dataRes.ok) throw new Error(`Could not read sheet data (HTTP ${dataRes.status}).`);
@@ -121,15 +128,12 @@ function filterClauses() {
 function renderClauses(clauses) {
   const list  = document.getElementById('clauseList');
   const count = document.getElementById('count');
-
   count.textContent = `${clauses.length} clause${clauses.length !== 1 ? 's' : ''}`;
   list.innerHTML = '';
-
   if (!clauses.length) {
     list.innerHTML = '<p class="empty">No clauses match your search.</p>';
     return;
   }
-
   clauses.forEach(c => {
     const card = document.createElement('div');
     card.className = 'clause-card';
