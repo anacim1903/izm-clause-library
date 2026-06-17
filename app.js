@@ -1,91 +1,31 @@
 'use strict';
 
-const CLIENT_ID    = '44d73efb-0980-447f-8629-04c970ac0e74';
-const TENANT_ID    = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
-const SCOPES       = ['Files.Read', 'Sites.Read.All'];
+const SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/' +
+  '1ebPCHEkZz5sDRTrobt_NPmXGohFhKVjzQUpOMZCkegI' +
+  '/gviz/tq?tqx=out:csv';
 
-const SITE_URL     = 'https://graph.microsoft.com/v1.0/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:';
-const LIBRARY_NAME = 'Documentos Compartilhados';
-const FILE_PATH    = 'AI/260616 - IZM Clauses.xlsx';
-
-let msalInstance;
 let allClauses = [];
 
-Office.onReady(() => {
-  msalInstance = new msal.PublicClientApplication({
-    auth: {
-      clientId:    CLIENT_ID,
-      authority:   `https://login.microsoftonline.com/${TENANT_ID}`,
-      redirectUri: window.location.href.split('?')[0].split('#')[0],
-    },
-    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
-  });
-  msalInstance.handleRedirectPromise().then(init).catch(showError);
+Office.onReady(async () => {
+  await loadClauses();
 });
-
-async function init() {
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    await loadClauses();
-  } else {
-    showStatus('Signing in…');
-    try {
-      await msalInstance.loginPopup({ scopes: SCOPES });
-      await loadClauses();
-    } catch (e) {
-      showError(e);
-    }
-  }
-}
-
-async function getToken() {
-  const account = msalInstance.getAllAccounts()[0];
-  try {
-    const r = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account });
-    return r.accessToken;
-  } catch {
-    const r = await msalInstance.acquireTokenPopup({ scopes: SCOPES, account });
-    return r.accessToken;
-  }
-}
 
 async function loadClauses() {
   showStatus('Loading clauses…');
   try {
-    const token   = await getToken();
-    const headers = { Authorization: `Bearer ${token}` };
+    const res = await fetch(SHEET_URL);
+    if (!res.ok) throw new Error(`Could not load sheet (HTTP ${res.status})`);
+    const text = await res.text();
 
-    // Find the document library by name
-    const drivesRes = await fetch(`${SITE_URL}/drives`, { headers });
-    if (!drivesRes.ok) throw new Error(`Could not list drives (HTTP ${drivesRes.status})`);
-    const { value: drives } = await drivesRes.json();
-    const drive = drives.find(d => d.name === LIBRARY_NAME) || drives[0];
-    if (!drive) throw new Error('No document libraries found on this SharePoint site.');
+    const { data } = Papa.parse(text, { skipEmptyLines: true });
 
-    // Access the Excel workbook
-    const encoded = FILE_PATH.split('/').map(encodeURIComponent).join('/');
-    const base    = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encoded}:`;
-
-    const wsRes = await fetch(`${base}/workbook/worksheets`, { headers });
-    if (!wsRes.ok) throw new Error(`Could not open workbook (HTTP ${wsRes.status})`);
-    const { value: sheets } = await wsRes.json();
-    if (!sheets || !sheets.length) throw new Error('No worksheets found in the Excel file.');
-
-    const sheetName = sheets[0].name;
-    const dataRes = await fetch(
-      `${base}/workbook/worksheets('${encodeURIComponent(sheetName)}')/usedRange`,
-      { headers }
-    );
-    if (!dataRes.ok) throw new Error(`Could not read sheet data (HTTP ${dataRes.status}).`);
-    const { values } = await dataRes.json();
-
-    if (!values || values.length < 2) {
-      showStatus('No clauses found. Add rows to the Excel file and reload.');
+    if (!data || data.length < 2) {
+      showStatus('No clauses found. Add rows to the Google Sheet and reload.');
       return;
     }
 
-    allClauses = values
-      .slice(1)
+    allClauses = data.slice(1)
       .filter(r => r[0])
       .map(r => ({
         title: String(r[0] ?? '').trim(),
