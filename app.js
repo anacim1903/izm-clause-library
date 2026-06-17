@@ -2,7 +2,7 @@
 
 const CLIENT_ID    = '44d73efb-0980-447f-8629-04c970ac0e74';
 const TENANT_ID    = 'd322a5f5-4eaf-439f-a75a-d4c3822080db';
-const SCOPES       = ['Files.Read', 'Sites.Read.All'];
+const SCOPES       = ['Files.ReadWrite', 'Sites.Read.All'];
 
 const SITE_URL     = 'https://graph.microsoft.com/v1.0/sites/izumedeirosadvogados.sharepoint.com:/sites/IzuMedeiros:';
 const LIBRARY_NAME = 'Documentos Compartilhados';
